@@ -1,17 +1,11 @@
 # Instituto Tecnológico de Costa Rica
-
 ---
-
-## Diseño de Software
-
+## Diseño de Software Grupo 2 - IC6821
 <br><br>
-
 ### Estudiantes
 **Marlon Badilla**  
 **Guillermo Coto**
-
 <br><br>
-
 ### Semestre 1  
 ### 2026
 
