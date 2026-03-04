@@ -1,2 +1,24 @@
-# Dise-o-Caso1
-Este repositorio es para el caso 1 del curso de Diseño
+# Instituto Tecnológico de Costa Rica
+
+---
+
+## Diseño de Software
+
+<br><br>
+
+### Estudiantes
+**Marlon Badilla**  
+**Guillermo Coto**
+
+<br><br>
+
+### Semestre 1  
+### 2026
+
+---
+
+<br><br><br>
+
+<center>
+Portada de Trabajo Académico
+</center>
