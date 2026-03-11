@@ -108,8 +108,15 @@ Download + save job history
 ## 1.3 Component design strategy
 Defines the technique and principles for frontend component design: how component reuse is achieved, how styles are centralized, branding, internationalization, and responsiveness.
 
-## 1.4 Security
-Technologies, techniques, and classes (with their location in the project structure) responsible for authentication and authorization of permissions and sessions.
+## 1.4 Security (Technologies, techniques, and classes (with their location in the project structure) responsible for authentication and authorization of permissions and sessions.)
+
+metodo del multifactor :        uso del sigle app           si comparte un authentication         y si comparte un sesion, se guarda en cash
+
+ya 1-Authenticator or server name: Aws Cognito
+YA 2-Authorization: IAM
+YA 3-Que politica de acceso y el nombre del servicio de politicas: RBAC
+YA-4-Lista de permisos dpor Role. ADMIN, USER_TRANSFER, USER_CLIENTE, SOPORTE.   
+ya 5-Cual es el servicio de secure storage para variables de ENV, key y security data? : KMS
 
 ## 1.5 Layered design
 Design and explanation of the different layers of the frontend application.
