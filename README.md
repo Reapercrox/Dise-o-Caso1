@@ -110,13 +110,35 @@ Defines the technique and principles for frontend component design: how componen
 
 ## 1.4 Security (Technologies, techniques, and classes (with their location in the project structure) responsible for authentication and authorization of permissions and sessions.)
 
-metodo del multifactor :        uso del sigle app           si comparte un authentication         y si comparte un sesion, se guarda en cash
+* Authentication method: Multifactor through AWS Cognito
+* Authorization: AWS Cognito       
+* Single sign on AWS Cognito
+* Authentication handled through IAM
+* Access method: RBAC
+* Roles: ADMIN, USER_AGENT, SUPPORT, AUDIT
+* Permissions by role:
+*   * ADMIN:
+*     + Permission code: MANAGE_USER
+*     + Permission code: VIEW_REPORTS
+*     + Permission code: EDIT_TEMPLATES
+*     + Permission code: DOWNLOAD_DUA
+*   * USER_AGENT:
+*      + Permission code: LOAD_FILES
+*      + Permission code: GENERATE_DUA
+*      + Permission code: DOWNLOAD_DUA
+*   * SUPPORT:
+*      + Permission code: VIEW_ERROR_REPORTS
+*      + Permission code: EDIT_TEMPLATES
+*      + Permission code: LOAD_FILES
+*      + Permission code: DOWNLOAD_DUA
+*      + Permission code: GENERATE_DUA
+*   * AUDIT:
+*      + Permission code: VIEW_REPORTS
+*      + Permission code: DOWNLOAD_DUA
 
-ya 1-Authenticator or server name: Aws Cognito
-YA 2-Authorization: IAM
-YA 3-Que politica de acceso y el nombre del servicio de politicas: RBAC
-YA-4-Lista de permisos dpor Role. ADMIN, USER_TRANSFER, USER_CLIENTE, SOPORTE.   
-ya 5-Cual es el servicio de secure storage para variables de ENV, key y security data? : KMS
+*  AWS Secrets Manager is used to store Environment variables, API keys, Sensitive configuration data
+*  Server name: customsidentityserver
+
 
 ## 1.5 Layered design
 Design and explanation of the different layers of the frontend application.
