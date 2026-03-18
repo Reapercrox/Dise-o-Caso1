@@ -108,6 +108,12 @@ Download + save job history
 ## 1.3 Component design strategy
 Defines the technique and principles for frontend component design: how component reuse is achieved, how styles are centralized, branding, internationalization, and responsiveness.
 
+* Use atomic design for basic and complex component design
+* Centralize one style per component
+* Component-scope naming convention
+* Use only "rem" positional units to support responsivenes in the design
+* Components support react i-18next
+
 ## 1.4 Security (Technologies, techniques, and classes (with their location in the project structure) responsible for authentication and authorization of permissions and sessions.)
 
 * Authentication method: Multifactor through AWS Cognito
