@@ -48,9 +48,9 @@
 - Integration testing: Playwright version 1.58.2
 - Cloud service: AWS cloud services
 - Hosted by AWS App Services
-- Code repositories in Azure DevOps
+- Code repositories in Github
 - Automated code tasks with Husky 9.1.7
-- CI/CD with Azure DevOps Pipelines
+- CI/CD with Github DevOps Pipelines
 - Environments: development, stage, and production
 - Environments deployments: Azure DevOps Environments
 - Observability with AWS Application Insights SDK / Gr
@@ -113,6 +113,7 @@ Defines the technique and principles for frontend component design: how componen
 * Component-scope naming convention
 * Use only "rem" positional units to support responsivenes in the design
 * Components support react i-18next
+* Accesibility is out of scope
 
 ## 1.4 Security (Technologies, techniques, and classes (with their location in the project structure) responsible for authentication and authorization of permissions and sessions.)
 
@@ -148,6 +149,278 @@ Defines the technique and principles for frontend component design: how componen
 
 ## 1.5 Layered design
 Design and explanation of the different layers of the frontend application.
+
+Folder structure:
+/webapp
+│
+├── .github/
+│   └── workflows/                # GitHub DevOps pipelines
+│
+├── public/
+│   └── assets/                   # static assets
+│
+├── src/
+│
+│   ├── app/                      # application bootstrap & providers
+│   │   ├── App.tsx
+│   │   ├── routes.tsx
+│   │   ├── store.ts
+│   │   └── providers/
+│   │       ├── AuthProvider.tsx
+│   │       ├── I18nProvider.tsx
+│   │       └── ThemeProvider.tsx
+│
+│   ├── domain/                   # business models & rules
+│   │   ├── dua/
+│   │   ├── user/
+│   │   └── permissions/
+│
+│   ├── application/              # use cases / orchestration
+│   │   ├── generateDUA/
+│   │   ├── validation/
+│   │   └── workflow/
+│
+│   ├── infrastructure/           # external integrations
+│   │   ├── api/
+│   │   │   └── httpClient.ts
+│   │   ├── cognito/
+│   │   │   ├── authService.ts
+│   │   │   └── sessionManager.ts
+│   │   ├── observability/
+│   │   │   └── appInsights.ts
+│   │   └── storage/
+│
+│   ├── presentation/
+│   │
+│   │   ├── components/           # Atomic design
+│   │   │   ├── atoms/
+│   │   │   ├── molecules/
+│   │   │   ├── organisms/
+│   │   │   └── templates/
+│   │   │
+│   │   ├── pages/
+│   │   │   ├── Dashboard/
+│   │   │   ├── GenerateDUA/
+│   │   │   └── Reports/
+│   │   │
+│   │   ├── hooks/
+│   │   ├── layouts/
+│   │   └── styles/
+│
+│   ├── security/
+│   │   ├── rbac/
+│   │   │   ├── roles.ts
+│   │   │   ├── permissions.ts
+│   │   │   └── accessGuard.ts
+│   │   └── auth/
+│   │       └── tokenValidator.ts
+│
+│   ├── shared/
+│   │   ├── constants/
+│   │   ├── utils/
+│   │   ├── types/
+│   │   └── config/
+│
+│   ├── i18n/
+│   │   ├── index.ts
+│   │   └── locales/
+│
+│   └── main.tsx
+│
+├── tests/
+│   ├── unit/                     # Jest
+│   └── integration/              # Playwright
+│
+├── .husky/                       # git hooks
+├── tsconfig.json
+├── eslint.config.js
+├── prettier.config.js
+└── package.json
+
+List of responsability layers:
+* Presentation Layer
+* Component Layer
+* Application Layer
+* Domain Layer
+* Security Layer
+* Infrastructure Layer
+* Integration Layer
+* State Management Layer
+* Observability Layer
+* Configuration Layer
+* Shared/Common Layer
+
+Execution Workflow:
+* User accesses application URL (AWS App Services hosting)
+* Application bootstrap initializes providers (Auth, i18n, Theme, Observability)
+* Cognito session validation executed
+* MFA authentication performed if session not valid
+* JWT token retrieved and stored in secure session context
+* RBAC role extracted from token claims
+* Route guard validates permissions before page rendering
+* Page loads Atomic components and layout templates
+* User selects folder for processing
+* Files uploaded through infrastructure API client
+* Backend ingestion workflow triggered
+* Frontend subscribes to workflow status updates
+* UI updates stage-based progress:
+  * Ingestion
+  * OCR
+  * Extraction
+  * Mapping
+  * Validation
+  * Word generation
+* Validation results mapped into domain models
+* Traceability metadata displayed per field
+* User edits fields with undo/reset capability
+* Generate DUA action executed
+* File download enabled based on RBAC permission
+* Observability events sent to AWS Application Insights
+* Session maintained via Cognito token refresh
+* Logout clears session and cached state
+
+Gaps detected:
+1. State Management Strategy Missing
+  No definition of:
+    Redux / Zustand / React Query / Context boundaries.
+2. API Communication Pattern Undefined
+  Missing:
+    * REST vs GraphQL
+    * retry strategy
+    * error normalization
+    * request caching
+3. Token Storage Strategy Not Defined
+  Need clarification:
+    * memory storage vs cookies
+    * refresh token handling
+    * XSS mitigation approach
+4. Error Handling Layer Missing
+  No definition for:
+    * global error boundary
+    * API error mapping
+    * UX error consistency
+5. Environment Configuration Strategy Missing
+  Need definition of:
+    * env variable injection
+    * runtime config per environment
+    * secrets retrieval strategy
+6. Observability Scope Undefined
+  You mention AWS Application Insights but not:
+    * what events are tracked
+    * performance metrics
+    * user journey telemetry
+7. Loading & Async Strategy Missing
+  Your workflow implies long OCR processing but lacks:
+    * polling vs websocket strategy
+    * cancellation handling
+    * optimistic UI rules
+8. Permission Enforcement Location Not Explicit
+  * RBAC defined but missing statement:
+  * enforcement at route level
+  * component level
+  * API call level
+
+The frontend performs Server-Side Rendering (SSR) using ReactJS executed within a Node.js runtime hosted on AWS App Runner.
+If no authenticated session exists, the Security Layer invokes AWS Cognito authentication with Multi-Factor Authentication enabled.
+Upon successful authentication:
+  * Cognito issues JWT tokens.
+  * User roles are extracted for RBAC authorization.
+  * The requested visual resource is rendered through the Components Layer.
+
+**Component Structure**
+Components follow Atomic Design:
+  * Atoms
+  * Molecules
+  * Organisms
+  * Templates
+  * Pages
+
+A Hooks layer connects UI interactions with application Services.
+
+**Services Layer**
+Services implement application operations and workflows.
+Services may access:
+  * Utils Layer
+  * ApiClients Layer
+  * Settings Layer
+
+**Settings Layer**
+The Settings layer retrieves configuration securely from AWS Secrets Manager during server-side rendering.
+Secrets include:
+  * API keys
+  * service endpoints
+  * environment configuration
+
+**ApiClients Layer**
+ApiClients handle communication with external APIs.
+  * Endpoints and credentials are read from Settings.
+  * Requests and responses use shared Models.
+  * All data is validated using the DataValidation layer.
+
+**Shared Layers**
+The following layers are accessible system-wide:
+  * Models
+  * Utils
+  * State Management
+  * Exception Handling
+
+**Notification Service**
+The NotificationService allows asynchronous processing through callback endpoints exposed via AWS API Gateway.
+External systems notify processing completion through callbacks rather than polling.
+
+**Logging and Observability**
+System events are registered through the Logs layer and transmitted to:
+  * AWS CloudWatch Logs
+  * AWS Application Insights
+
+**Deployment Pipeline**
+Code is stored in GitHub repositories and deployed using GitHub DevOps pipelines across environments:
+  * Development
+  * Stage
+  * Production
+Deployment targets AWS App Runner services.
+  
++----------------------+
+|     User Browser     |
++----------+-----------+
+           |
+           v
++-----------------------------+
+|        AWS App Runner       |
+|     NodeJS + React SSR      |
++-------------+---------------+
+              |
+        Authentication
+              |
+        AWS Cognito (MFA)
+              |
++-----------------------------+
+|      Components Layer       |
+|       Atomic Design UI      |
++-------------+---------------+
+              |
+            Hooks
+              |
+        Services Layer
+              |
+   +----------+-----------+
+   |          |           |
+ Utils   ApiClients   Settings
+                         |
+              AWS Secrets Manager
+                         |
+                   Secrets / Config
+
+ApiClients → External APIs
+External APIs → API Gateway → Notification Service
+
+Shared:
+Models | Validation | State | Exception Handling
+
+Logs → CloudWatch → AWS Application Insights
+
+CI/CD:
+GitHub → Pipelines → Dev/Stage/Prod → App Runner
 
 ## 1.6 Design patterns
 Class design (with their location in the project structure) where it is necessary to apply object-oriented design patterns, for example: security, UI refresh, receiving notifications, state storage, API calls, asynchronous operations, session invalidation, event-driven programming, object creation.
