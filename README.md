@@ -113,7 +113,7 @@ Defines the technique and principles for frontend component design: how componen
 * Authentication method: Multifactor through AWS Cognito
 * Authorization: AWS Cognito       
 * Single sign on AWS Cognito
-* Authentication handled through IAM
+* Authentication handled through AWS Cognito
 * Access method: RBAC
 * Roles: ADMIN, USER_AGENT, SUPPORT, AUDIT
 * Permissions by role:
