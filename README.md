@@ -151,6 +151,7 @@ Defines the technique and principles for frontend component design: how componen
 Design and explanation of the different layers of the frontend application.
 
 Folder structure:
+```text
 /webapp
 │
 ├── .github/
@@ -236,6 +237,7 @@ Folder structure:
 ├── eslint.config.js
 ├── prettier.config.js
 └── package.json
+```
 
 List of responsability layers:
 * Presentation Layer
@@ -379,7 +381,7 @@ Code is stored in GitHub repositories and deployed using GitHub DevOps pipelines
   * Stage
   * Production
 Deployment targets AWS App Runner services.
-  
+```text  
 +----------------------+
 |     User Browser     |
 +----------+-----------+
@@ -421,6 +423,7 @@ Logs → CloudWatch → AWS Application Insights
 
 CI/CD:
 GitHub → Pipelines → Dev/Stage/Prod → App Runner
+```
 
 ## 1.6 Design patterns
 Class design (with their location in the project structure) where it is necessary to apply object-oriented design patterns, for example: security, UI refresh, receiving notifications, state storage, API calls, asynchronous operations, session invalidation, event-driven programming, object creation.
