@@ -75,7 +75,7 @@
 #### Confidence
 - Traffic-light indicator (green/yellow/red) + a short explanation of why.
 
-### Wireframes
+### Wireframes              https://kit-markup-67757482.figma.site
 Home / Folder selection  
 Button: “Select folder”  
 Detected files list with icons and type (PDF/DOCX/XLSX/IMG)  
@@ -426,7 +426,38 @@ GitHub → Pipelines → Dev/Stage/Prod → App Runner
 ```
 
 ## 1.6 Design patterns
-Class design (with their location in the project structure) where it is necessary to apply object-oriented design patterns, for example: security, UI refresh, receiving notifications, state storage, API calls, asynchronous operations, session invalidation, event-driven programming, object creation.
+This section lists the object-oriented design patterns used in the frontend, including **where each pattern lives in the current project structure** (security, UI refresh, notifications, state storage, API calls, async operations, session invalidation, event-driven programming, and object creation). :contentReference[oaicite:1]{index=1}
+
+### Pattern map (concern → pattern → classes/modules → location)
+
+| Concern / Need | Pattern | Classes / Modules | Location (existing folders) | How it is used |
+|---|---|---|---|---|
+| Authentication integration (MFA, login, logout, refresh) | **Facade** | `authService` | `src/infrastructure/cognito/authService.ts` :contentReference[oaicite:2]{index=2} | Wraps Cognito calls behind a small API used by UI/providers. |
+| Session lifecycle (valid, refreshing, expired) + session invalidation | **State** | `sessionManager` | `src/infrastructure/cognito/sessionManager.ts` :contentReference[oaicite:3]{index=3} | Centralizes token refresh / expiration rules and exposes a single session state to the app. |
+| Route-level authorization (RBAC) before rendering pages | **Proxy (Guard)** | `accessGuard` | `src/security/rbac/accessGuard.ts` :contentReference[oaicite:4]{index=4} | Blocks navigation/render if the user role/permissions do not allow the route/action. |
+| Token validation rules (signature/claims/expiration) | **Strategy** | `tokenValidator` | `src/security/auth/tokenValidator.ts` :contentReference[oaicite:5]{index=5} | Encapsulates validation logic so rules can evolve without touching UI code. |
+| Permissions catalog (roles → permissions) | **Specification (Rules as data)** | `roles`, `permissions` | `src/security/rbac/roles.ts`, `src/security/rbac/permissions.ts` :contentReference[oaicite:6]{index=6} | Defines authorization rules and permission codes used by guards and UI. |
+| Central HTTP calls to backend | **Facade** | `httpClient` | `src/infrastructure/api/httpClient.ts` :contentReference[oaicite:7]{index=7} | Single entrypoint for REST calls (GET/POST/etc.) used by application workflows. |
+| Cross-cutting HTTP behaviors (auth header, retry, error mapping, logging) | **Decorator (Interceptor-style)** | `httpClient` internal wrappers (e.g., attach token, retry) | `src/infrastructure/api/httpClient.ts` :contentReference[oaicite:8]{index=8} | Adds behaviors without changing every call site; keeps API calls consistent. |
+| App bootstrap + global concerns (auth, i18n, theme) | **Provider / Dependency Injection (composition)** | `AuthProvider`, `I18nProvider`, `ThemeProvider` | `src/app/providers/*` :contentReference[oaicite:9]{index=9} | Provides global services/context to all pages/components. |
+| Global state storage (job, selected files, progress, issues) | **Redux/Flux-style Store** | `store` | `src/app/store.ts` :contentReference[oaicite:10]{index=10} | Single source of truth for UI state; reduces inconsistent local states. |
+| Orchestrate the use case (select folder → analyze → poll/receive updates → review → export) | **Mediator (Use-case coordinator)** | `GenerateDUA` use case modules | `src/application/generateDUA/` :contentReference[oaicite:11]{index=11} | Keeps UI thin: pages trigger use cases; use cases call infrastructure and update state. |
+| Long-running workflow status updates (UI refresh by stages) | **Observer (Pub/Sub)** | Workflow “status subscription” utilities + hooks | `src/application/workflow/` + `src/presentation/hooks/` :contentReference[oaicite:12]{index=12} | UI subscribes to job status events (polling or callback-driven) and re-renders progress screens. |
+| Validation rules (currency mismatch, totals mismatch, invalid date) | **Strategy** | validation rule modules | `src/application/validation/` :contentReference[oaicite:13]{index=13} | Each rule is a strategy; a validator runs all strategies and produces an `Issues` list. |
+| Domain modeling (DUA fields, extracted evidence, confidence) | **Value Objects / Domain Model** | DUA models | `src/domain/dua/` :contentReference[oaicite:14]{index=14} | Keeps “DUA Field + confidence + evidence source” consistent across UI and workflows. |
+| UI actions as testable operations (Analyze, Cancel, Retry OCR, Generate Word) | **Command** | command modules for workflow actions | `src/application/workflow/` :contentReference[oaicite:15]{index=15} | Encapsulates each action so it can be tested without React rendering. |
+| Observability (track events: start job, cancel, retry, download) | **Facade** | `appInsights` | `src/infrastructure/observability/appInsights.ts` :contentReference[oaicite:16]{index=16} | Centralized telemetry for key user journeys and system events. |
+| Configuration and secrets access | **Facade** | config/settings utilities | `src/shared/config/` :contentReference[oaicite:17]{index=17} | Centralizes env/config reads; avoids scattered hardcoded constants. |
+
+---
+### Event-driven programming (notifications vs polling)
+The system supports asynchronous completion updates (“Notification Service” callbacks) and can also fall back to polling. In the frontend this is represented as an **Observer subscription** in `src/application/workflow/` consumed by hooks in `src/presentation/hooks/`, which updates the UI stage-by-stage (Ingestion → OCR → Extraction → Mapping → Validation → Word). 
+
+### Where patterns appear in the current architecture
+- **Security Layer**: RBAC guard + token validation + Cognito session lifecycle. :contentReference[oaicite:19]{index=19}  
+- **Infrastructure Layer**: HTTP client, Cognito integration, observability SDK. :contentReference[oaicite:20]{index=20}  
+- **Application Layer**: use cases (Generate DUA), workflow orchestration, validation strategies. :contentReference[oaicite:21]{index=21}  
+- **Presentation Layer**: pages/components use hooks that subscribe to workflow updates and read state from `store.ts`. :contentReference[oaicite:22]{index=22}
 
 ## 1.7 Scaffold
 A folder under `/src` containing the project scaffold, generated based on the full specification from sections 1.1 to 1.6.
