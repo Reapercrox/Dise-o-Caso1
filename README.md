@@ -75,7 +75,7 @@
 #### Confidence
 - Traffic-light indicator (green/yellow/red) + a short explanation of why.
 
-### Wireframes              https://kit-markup-67757482.figma.site
+### Wireframes              (https://golden-wasp-02185792.figma.site)
 Home / Folder selection  
 Button: “Select folder”  
 Detected files list with icons and type (PDF/DOCX/XLSX/IMG)  
