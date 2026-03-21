@@ -1,0 +1,28 @@
+import type { Role } from '../../domain/permissions/Role';
+import type { PermissionCode } from './permissions';
+import { PERMISSIONS } from './permissions';
+
+export const ROLE_PERMISSIONS: Record<Role, PermissionCode[]> = {
+  ADMIN: [
+    PERMISSIONS.MANAGE_USER,
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.EDIT_TEMPLATES,
+    PERMISSIONS.DOWNLOAD_DUA,
+  ],
+  USER_AGENT: [
+    PERMISSIONS.LOAD_FILES,
+    PERMISSIONS.GENERATE_DUA,
+    PERMISSIONS.DOWNLOAD_DUA,
+  ],
+  SUPPORT: [
+    PERMISSIONS.VIEW_ERROR_REPORTS,
+    PERMISSIONS.EDIT_TEMPLATES,
+    PERMISSIONS.LOAD_FILES,
+    PERMISSIONS.DOWNLOAD_DUA,
+    PERMISSIONS.GENERATE_DUA,
+  ],
+  AUDIT: [
+    PERMISSIONS.VIEW_REPORTS,
+    PERMISSIONS.DOWNLOAD_DUA,
+  ],
+};

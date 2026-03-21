@@ -1,0 +1,61 @@
+{
+  "common": {
+    "loading": "Loading…",
+    "cancel": "Cancel",
+    "retry": "Retry",
+    "save": "Save",
+    "reset": "Reset to AI suggestion",
+    "download": "Download",
+    "logout": "Logout",
+    "error": "An error occurred"
+  },
+  "home": {
+    "title": "DUA Generator",
+    "selectFolder": "Select Folder",
+    "analyze": "Analyze",
+    "detectedFiles": "Detected files"
+  },
+  "workflow": {
+    "stages": {
+      "idle": "Ready",
+      "ingestion": "Ingestion",
+      "ocr": "OCR Processing",
+      "extraction": "Data Extraction",
+      "mapping": "Field Mapping",
+      "validation": "Validation",
+      "word": "Generating Word",
+      "complete": "Complete",
+      "failed": "Failed"
+    },
+    "retryOCR": "Retry OCR",
+    "cancelJob": "Cancel"
+  },
+  "dua": {
+    "title": "DUA Review",
+    "fields": "DUA Fields",
+    "evidence": "Evidence",
+    "confidence": {
+      "green": "High confidence",
+      "yellow": "Medium confidence",
+      "red": "Low confidence"
+    },
+    "generateWord": "Generate Word (.docx)",
+    "issueCount": "{{count}} issue(s) found"
+  },
+  "issues": {
+    "title": "Issues & Validations",
+    "fix": "Fix",
+    "markReviewed": "Mark as Reviewed",
+    "ignoreWithReason": "Ignore with reason"
+  },
+  "reports": {
+    "title": "Reports",
+    "jobHistory": "Job History"
+  },
+  "auth": {
+    "login": "Sign In",
+    "username": "Username",
+    "password": "Password",
+    "mfa": "MFA Code"
+  }
+}

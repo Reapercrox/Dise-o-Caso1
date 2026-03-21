@@ -1,0 +1,61 @@
+{
+  "common": {
+    "loading": "Cargando…",
+    "cancel": "Cancelar",
+    "retry": "Reintentar",
+    "save": "Guardar",
+    "reset": "Restablecer sugerencia IA",
+    "download": "Descargar",
+    "logout": "Cerrar sesión",
+    "error": "Ocurrió un error"
+  },
+  "home": {
+    "title": "Generador DUA",
+    "selectFolder": "Seleccionar carpeta",
+    "analyze": "Analizar",
+    "detectedFiles": "Archivos detectados"
+  },
+  "workflow": {
+    "stages": {
+      "idle": "Listo",
+      "ingestion": "Ingesta",
+      "ocr": "Procesamiento OCR",
+      "extraction": "Extracción de datos",
+      "mapping": "Mapeo de campos",
+      "validation": "Validación",
+      "word": "Generando Word",
+      "complete": "Completado",
+      "failed": "Fallido"
+    },
+    "retryOCR": "Reintentar OCR",
+    "cancelJob": "Cancelar"
+  },
+  "dua": {
+    "title": "Revisión DUA",
+    "fields": "Campos DUA",
+    "evidence": "Evidencia",
+    "confidence": {
+      "green": "Alta confianza",
+      "yellow": "Confianza media",
+      "red": "Baja confianza"
+    },
+    "generateWord": "Generar Word (.docx)",
+    "issueCount": "{{count}} problema(s) encontrado(s)"
+  },
+  "issues": {
+    "title": "Problemas y Validaciones",
+    "fix": "Corregir",
+    "markReviewed": "Marcar como revisado",
+    "ignoreWithReason": "Ignorar con razón"
+  },
+  "reports": {
+    "title": "Reportes",
+    "jobHistory": "Historial de trabajos"
+  },
+  "auth": {
+    "login": "Iniciar sesión",
+    "username": "Usuario",
+    "password": "Contraseña",
+    "mfa": "Código MFA"
+  }
+}

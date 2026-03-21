@@ -1,0 +1,22 @@
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--color-bg);
+}
+
+.content {
+  margin-left: var(--sidebar-w);
+  flex: 1;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+}
+
+.loader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 60vh;
+}
