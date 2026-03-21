@@ -460,4 +460,22 @@ The system supports asynchronous completion updates (“Notification Service” 
 - **Presentation Layer**: pages/components use hooks that subscribe to workflow updates and read state from `store.ts`. :contentReference[oaicite:22]{index=22}
 
 ## 1.7 Scaffold
-A folder under `/src` containing the project scaffold, generated based on the full specification from sections 1.1 to 1.6.
+The complete scaffold
+
+[`src/frontend/webapp/`](./src/frontend/webapp)
+
+Structure overview:
+
+| Layer | Path |
+|---|---|
+| App bootstrap & providers | [`src/app/`](./src/frontend/webapp/src/app) |
+| Domain models | [`src/domain/`](./src/frontend/webapp/src/domain) |
+| Application / use cases | [`src/application/`](./src/frontend/webapp/src/application) |
+| Infrastructure | [`src/infrastructure/`](./src/frontend/webapp/src/infrastructure) |
+| Presentation (UI) | [`src/presentation/`](./src/frontend/webapp/src/presentation) |
+| Security (RBAC) | [`src/security/`](./src/frontend/webapp/src/security) |
+| Shared utilities | [`src/shared/`](./src/frontend/webapp/src/shared) |
+| i18n (EN/ES) | [`src/i18n/`](./src/frontend/webapp/src/i18n) |
+| Unit tests (Jest) | [`tests/unit/`](./src/frontend/webapp/tests/unit) |
+| Integration tests (Playwright) | [`tests/integration/`](./src/frontend/webapp/tests/integration) |
+| CI/CD pipeline | [`.github/workflows/ci-cd.yml`](./src/frontend/webapp/.github/workflows/ci-cd.yml) |
