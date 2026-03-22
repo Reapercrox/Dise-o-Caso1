@@ -106,11 +106,18 @@ Download + save job history
 ![login](/media/5_Export.png)
 
 **Testing results**
-Prueba de mamá de Guillermo: ![login](/media/pruebaGuillermo1.png)
 
-Prueba de hermana de Guillermo: ![login](/media/pruebaGuillermo2.png)
+Test de mamá de Guillermo:
 
-Prueba de amigo de Marlon: ![login](/media/pruebaMarlon.png)
+![login](/media/pruebaGuillermo1.png)
+
+Test de hermana de Guillermo:
+
+![login](/media/pruebaGuillermo2.png)
+
+Test de amigo de Marlon:
+
+![login](/media/pruebaMarlon.jpg)
 
 ## 1.3 Component design strategy
 Defines the technique and principles for frontend component design: how component reuse is achieved, how styles are centralized, branding, internationalization, and responsiveness.
