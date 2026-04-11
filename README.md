@@ -493,3 +493,457 @@ Structure overview:
 | Unit tests (Jest) | [`tests/unit/`](./src/frontend/webapp/tests/unit) |
 | Integration tests (Playwright) | [`tests/integration/`](./src/frontend/webapp/tests/integration) |
 | CI/CD pipeline | [`.github/workflows/ci-cd.yml`](./src/frontend/webapp/.github/workflows/ci-cd.yml) |
+
+---
+
+# 2. Diseño del backend (DUA Streamliner)
+
+Este apartado documenta el backend como **sistema**: transporte, contrato de API, paradigma de negocio, hosting, límites de dominio (DDD), seguridad, observabilidad, DevOps, disponibilidad, escalabilidad y vistas **C4** (contexto, contenedores, componentes y código).
+
+## 2.1 Pila tecnológica
+
+### 2.1.1 Protocolo de transporte y de aplicación
+
+| Decisión | Elección (DUA Streamliner) | Justificación breve |
+|----------|----------------------------|---------------------|
+| Transporte | **TLS 1.2+ sobre TCP (HTTPS)**; terminación TLS en **Application Load Balancer (ALB)** con soporte **HTTP/2** | Exposición en Internet; compatibilidad con navegadores y clientes corporativos. |
+| Estilo de API sobre HTTP | **REST** con contrato **OpenAPI 3.1** | Alineado con integraciones amplias, caching HTTP donde aplique y simplicidad operativa para el MVP. |
+| Tiempo real (estado de jobs) | **SSE (Server-Sent Events)** como canal principal; **polling** como respaldo | Progreso por etapas (ingesta → OCR → extracción → mapeo → validación → Word) sin exigir WebSockets en todos los entornos. |
+| Mensajería / eventos internos | **Amazon SQS** (colas estándar + DLQ) | Desacopla la API síncrona del trabajo pesado (OCR, extracción); absorbe picos y facilita reintentos. |
+
+**Paradigma de la lógica de negocio**
+
+- **Sincrónico (request/response)**: autenticación delegada (validación JWT), creación de jobs, consulta de metadatos, descarga de artefactos ya generados.
+- **Asíncrono por colas/eventos**: pipeline de documentos (ingesta, OCR, extracción semántica, mapeo, validación, generación Word) ejecutado por **workers** consumiendo mensajes de SQS.
+- **Batch** (fase posterior al MVP): reportes agregados, reconciliación y métricas de calidad fuera del camino online.
+
+### 2.1.2 API service (capa de exposición)
+
+- **Amazon API Gateway (HTTP API)** en el borde: enrutamiento, **throttling**, **CORS**, versionado por prefijo (`/v1`), documentación publicada desde OpenAPI.
+- **AWS WAF** asociado al ALB/API Gateway para reglas básicas (rate-based, firmas comunes).
+- No se define **BFF** separado en el MVP: el frontend SSR llama a un único **API Backend**; si en el futuro divergen fuerte web vs móvil, se evalúa BFF.
+
+### 2.1.3 Hosting service (dónde corre el código)
+
+| Artefacto | Modelo | Servicio AWS (referencia) |
+|-------------|--------|---------------------------|
+| API REST + SSE | **Contenedores gestionados** | **AWS ECS Fargate** (servicio `api`) detrás de ALB |
+| Workers del pipeline | **Contenedores gestionados** | **AWS ECS Fargate** (servicio `worker`) escalado por profundidad de cola |
+| Funciones auxiliares livianas (opcional) | **Serverless** | **AWS Lambda** solo si un paso encaja en límites de tiempo/tamaño (p. ej. transformaciones pequeñas) |
+
+**Lenguaje y framework**
+
+- **Python 3.12** + **FastAPI 0.115+** (API, validación con Pydantic, OpenAPI nativo).
+- **Workers**: mismo repositorio, proceso distinto (`worker`) con consumidor SQS (biblioteca **boto3** / **aiobotocore** según diseño de I/O).
+
+**Datos y almacenamiento**
+
+- **Amazon RDS for PostgreSQL 16** (metadatos de jobs, campos DUA, trazabilidad fuente/página/snippet, issues).
+- **Amazon S3** (objetos: uploads, artefactos intermedios opcionales, `.docx` generado).
+- **Amazon ElastiCache for Redis** (estado efímero de progreso SSE, idempotencia corta, rate limiting suave — uso acotado al MVP).
+
+## 2.2 Servicios, microservicios, repositorios y DDD
+
+### 2.2.1 Decisiones explícitas
+
+| Eje | Decisión |
+|-----|----------|
+| **Artefactos desplegables** | **Dos** en el MVP: `api` (FastAPI) y `worker` (pipeline asíncrono). Misma base de código, distinto punto de entrada y escala independiente. |
+| **Repositorio** | **Monorepo** (el de este curso): `src/frontend/webapp` y `src/backend/` coexisten; CI con *path filters* para construir solo lo afectado. |
+| **Microservicios** | No se fragmenta en microservicios numerosos en el MVP: **monolito modular** repartido en **dos procesos** (API + worker) por acoplamiento operativo y consistencia transaccional en PostgreSQL. |
+| **Contratos** | **OpenAPI** (API pública); mensajes internos de cola con **JSON Schema** versionado (`schema_version` en el sobre del mensaje). |
+
+### 2.2.2 Contextos delimitados (DDD)
+
+| Bounded context | Responsabilidad | Notas |
+|-----------------|-----------------|-------|
+| **Identidad y acceso** | Validar **JWT** emitidos por **Amazon Cognito** (MFA del lado IdP); mapear claims a roles internos alineados con RBAC del frontend. | Sin “sesión server-side” obligatoria; API **stateless**. |
+| **Orquestación de jobs** | Crear/cancelar jobs, estados, transiciones y publicación de eventos de progreso. | Orquestación **por aplicación** + colas; sin motor BPM pesado en MVP. |
+| **Ingesta y almacenamiento** | Subida a S3, registro de archivos, detección de tipo y normalización de entrada. | Virus scan opcional (p. ej. ClamAV en worker) como mejora. |
+| **OCR y extracción de texto** | PDF nativo vs escaneo; motores OCR; extracción tabular. | Aísla dependencias de proveedor/local. |
+| **Extracción semántica y mapeo** | Entidades de dominio aduanero → campos DUA; confidence. | Corazón del dominio; reglas extensibles. |
+| **Validación y observaciones** | Reglas de negocio (totales, monedas, fechas, coherencia entre documentos). | Produce lista de *issues*. |
+| **Exportación DUA** | Generación **Word** desde plantilla y metadatos de revisión. | Salida en S3 + URL firmada. |
+
+**Patrones tácticos (por contexto)**
+
+- **Agregados** (ej. `Job`, `DuaDraft`) con invariantes claras.
+- **Repositorios** por agregado en la capa de persistencia.
+- **Servicios de dominio** donde la lógica no pertenece a una sola entidad.
+- **Anticorruption layer** frente a SDKs de AWS y, si aplica, conectores externos.
+
+## 2.3 Seguridad
+
+| Tema | Decisión |
+|------|----------|
+| **Autenticación vs autorización** | **OAuth2/OIDC** vía **Cognito**; API valida **JWT** (firma, `aud`, `iss`, exp/leeway). **Autorización**: RBAC por *claims* / grupos, espejo de permisos del frontend (`ADMIN`, `USER_AGENT`, `SUPPORT`, `AUDIT`). |
+| **Secretos** | Nunca en Git: **AWS Secrets Manager** (cadena BD, claves KMS opcionales) + **SSM Parameter Store** para no secretos versionables. |
+| **Cifrado** | **TLS** en tránsito; en reposo **S3 SSE-KMS**, **RDS encryption**, **EBS** cifrado en Fargate. |
+| **Superficie de API** | Validación estricta (Pydantic), límites de tamaño de payload, **rate limiting** en API Gateway; guía **OWASP API Top 10**. |
+| **Red** | API y workers en **subredes privadas**; salida a Internet vía **NAT Gateway** donde sea necesario; **VPC endpoints** (S3, SQS, Secrets Manager) para no exponer tráfico a servicios AWS por ruta pública. |
+| **Cumplimiento** | Retención de logs acotada; datos en **región** acordada; tratamiento de datos personales si los documentos los contienen (minimización en almacenamiento y trazas). |
+
+## 2.4 Observabilidad
+
+| Pilar | Qué instrumentar | Destino (AWS) |
+|-------|------------------|----------------|
+| **Logs** | JSON estructurado; `request_id`, `job_id`, `trace_id` en cada línea | **Amazon CloudWatch Logs** |
+| **Métricas** | RPS, latencias p95/p99, errores 4xx/5xx, profundidad SQS, duración por etapa del pipeline | **CloudWatch Metrics** + dashboards |
+| **Trazas** | **OpenTelemetry** en API y worker | **AWS X-Ray** (exportador) / correlación con logs |
+
+**Patrones**: health checks **liveness/readiness** en Fargate; **correlation ID** propagado de API a mensajes SQS y worker; SLIs de partida: disponibilidad API, tiempo hasta primer progreso de job, tasa de fallos de OCR.
+
+## 2.5 Infraestructura (DevOps)
+
+- **IaC**: **Terraform** (VPC, RDS, S3, SQS, ECS, ALB, API Gateway, IAM mínimo privilegio).
+- **CI/CD**: **GitHub Actions**; construcción de imágenes **OCI**, push a **Amazon ECR**, despliegue a ECS con estrategia **rolling**; camino hacia **blue/green** para la API si el negocio lo exige.
+- **Entornos**: `dev`, `staging`, `prod` con paridad razonable; datos no productivos anonimizados o sintéticos.
+- **Contenedores**: imágenes inmutables por digest; escaneo de vulnerabilidades en ECR; políticas de retención de imágenes.
+
+## 2.6 Disponibilidad
+
+- **Multi-AZ** para RDS en producción; backups automáticos y ventana de mantenimiento definida.
+- **ALB** multi-AZ; objetivos de SLA internos más estrictos que los del proveedor solo donde tenga sentido de costo.
+- **Resiliencia de dependencias**: **timeouts**, **retries con backoff** y **circuit breaker** hacia servicios externos (si se integran); DLQ en SQS para mensajes no procesables tras reintentos.
+- **Degradación**: colas absorben picos; la API puede seguir aceptando jobs aunque el worker esté lento, hasta límites de tamaño de cola y políticas de *backpressure*.
+
+## 2.7 Escalabilidad
+
+- **Stateless** en la capa `api` (sin sesión en memoria del servidor).
+- **Escalado horizontal** del `worker` según **ApproximateNumberOfMessagesVisible** en SQS y CPU si aplica.
+- **Particionamiento**: clave natural por `job_id` en almacenamiento y mensajes; en fases futuras, evaluar partición de tablas por volumen.
+- **Caching**: Redis para progreso y lecturas calientes de estado de job; **no** cachear respuestas mutables sin TTL estricto.
+- **Límites de auto-scaling** máximos para control de costos.
+
+## 2.8 Diseño C4
+
+### 2.8.1 Diagrama de contexto
+
+**Actores y sistemas externos**: el **operador aduanero** (persona) usa la aplicación web; el **sistema DUA Streamliner** orquesta la generación asistida del DUA; interactúa con **Amazon Cognito** (identidad), **Amazon S3** (documentos y resultados) y canales AWS de observabilidad. Referencias normativas (Hacienda/VUCE) permanecen como **fuentes de verdad del negocio** consultadas por humanos; integraciones electrónicas oficiales quedan fuera del MVP salvo decisión explícita posterior.
+
+```mermaid
+C4Context
+title DUA Streamliner — Diagrama de contexto (C4)
+
+Person(operador, "Operador aduanero", "Selecciona carpeta, revisa campos y exporta el DUA asistido.")
+System(dua, "DUA Streamliner", "Pipeline de ingesta, OCR, extracción semántica, mapeo, validación y generación Word con niveles de confianza.")
+
+System_Ext(cognito, "Amazon Cognito", "Autenticación MFA y emisión de tokens OIDC/JWT.")
+System_Ext(s3, "Amazon S3", "Almacenamiento de documentos fuente y artefactos generados.")
+System_Ext(obs, "AWS Observability", "CloudWatch / X-Ray para logs, métricas y trazas.")
+
+Rel(operador, dua, "Usa", "HTTPS")
+Rel(dua, cognito, "Valida tokens", "HTTPS/OIDC")
+Rel(dua, s3, "Lee y escribe objetos", "HTTPS (SDK + IAM)")
+Rel(dua, obs, "Emite telemetría", "HTTPS / agentes")
+```
+
+### 2.8.2 Diagrama de contenedores
+
+**Contenedores lógicos**: SPA/SSR (existente en el entregable frontend), **API Backend** (FastAPI) detrás de **API Gateway + ALB**, **Worker** (consumidor SQS), **PostgreSQL (RDS)**, **Redis (ElastiCache)**, **S3**, **SQS**. Flujo principal: el cliente crea un `job` por HTTPS; la API publica mensajes; el worker avanza etapas y persiste estado; el cliente recibe progreso por **SSE** y obtiene descarga vía URL firmada o endpoint de descarga autenticado.
+
+```mermaid
+C4Container
+title DUA Streamliner — Diagrama de contenedores (C4)
+
+Person(operador, "Operador aduanero", "Usuario del sistema")
+System_Boundary(sys, "DUA Streamliner") {
+    Container(web, "Aplicación web (SSR)", "Node.js 21 + React 19", "Interfaz, autenticación con Cognito, orquestación UX del flujo.")
+    Container(api, "API Backend", "Python 3.12 + FastAPI", "REST + OpenAPI; SSE de progreso; control de jobs y permisos.")
+    Container(worker, "Worker pipeline", "Python 3.12", "OCR, extracción, mapeo, validación, generación Word; consume SQS.")
+    ContainerDb(db, "Base de datos", "PostgreSQL 16 (RDS)", "Jobs, borradores DUA, trazabilidad e issues.")
+    ContainerQueue(q, "Cola de trabajos", "Amazon SQS", "Desacoplamiento y reintentos con DLQ.")
+    ContainerCache(cache, "Caché / estado efímero", "Redis (ElastiCache)", "Progreso SSE, deduplicación corta.")
+    ContainerStore(store, "Object storage", "Amazon S3", "Archivos subidos y salida .docx.")
+}
+
+System_Ext(cognito, "Amazon Cognito", "IdP OIDC")
+System_Ext(apigw, "Amazon API Gateway", "Borde HTTP: throttling, CORS, routing")
+System_Ext(alb, "Application Load Balancer", "TLS + HTTP/2 hacia ECS Fargate")
+
+Rel(operador, web, "Usa", "HTTPS")
+Rel(web, cognito, "Login/MFA", "HTTPS/OIDC")
+Rel(web, apigw, "API JSON + SSE", "HTTPS")
+Rel(apigw, alb, "Integración", "HTTPS")
+Rel(alb, api, "Forward", "HTTPS")
+Rel(api, db, "Lee/escribe metadatos", "TCP/TLS")
+Rel(api, q, "Publica mensajes de pipeline", "HTTPS (SDK)")
+Rel(api, store, "URLs firmadas / SDK", "HTTPS")
+Rel(api, cache, "Estado de progreso", "TCP/TLS")
+Rel(worker, q, "Consume", "HTTPS (SDK)")
+Rel(worker, db, "Persistencia", "TCP/TLS")
+Rel(worker, store, "Lee/Escribe objetos", "HTTPS (SDK)")
+Rel(worker, cache, "Actualiza progreso", "TCP/TLS")
+```
+
+### 2.8.3 Diagrama de componentes (contenedor API)
+
+**Componentes** agrupados por capas: **API (transporte)**, **Aplicación (casos de uso)**, **Dominio**, **Infraestructura**. Las flechas muestran dependencia en tiempo de ejecución típica (de borde hacia dominio).
+
+```mermaid
+flowchart TB
+  subgraph Transporte["Capa API (FastAPI)"]
+    R["Routers: jobs.py, dua.py, health.py"]
+    MW["Middleware: auth JWT, request_id, CORS"]
+    SSE["SSE: progress_stream"]
+  end
+
+  subgraph Aplicacion["Capa de aplicación"]
+    UC1["CreateJobHandler"]
+    UC2["GetJobStatusHandler"]
+    UC3["CancelJobHandler"]
+    UC4["ListIssuesHandler"]
+    UC5["DownloadArtifactHandler"]
+  end
+
+  subgraph Dominio["Capa de dominio"]
+    AG1["Agregado Job"]
+    AG2["Agregado DuaDraft"]
+    VO["Value Objects: Confidence, FieldEvidence"]
+    DS["Domain services: ValidationPolicy"]
+  end
+
+  subgraph Infra["Capa de infraestructura"]
+    REP1["JobRepository"]
+    REP2["DuaDraftRepository"]
+    S3A["S3StorageAdapter"]
+    SQSA["SqsEnqueueAdapter"]
+    CACHEA["RedisProgressAdapter"]
+    COG["CognitoJwtVerifier"]
+  end
+
+  MW --> R
+  R --> UC1
+  R --> UC2
+  R --> UC3
+  R --> UC4
+  R --> UC5
+  SSE --> UC2
+  UC1 --> AG1
+  UC2 --> AG1
+  UC3 --> AG1
+  UC4 --> AG2
+  UC5 --> AG2
+  UC1 --> DS
+  AG1 --> VO
+  AG2 --> VO
+  UC1 --> REP1
+  UC2 --> REP1
+  UC3 --> REP1
+  UC4 --> REP2
+  UC5 --> REP2
+  REP1 --> db[(PostgreSQL)]
+  REP2 --> db
+  UC1 --> S3A
+  UC1 --> SQSA
+  UC2 --> CACHEA
+  MW --> COG
+```
+
+**Componentes del worker (resumen)**
+
+- `PipelineDispatcher`: enruta mensaje a etapa (ingestión, OCR, extracción, mapeo, validación, export).
+- `OcrService`, `ExtractionService`, `MappingService`, `WordExportService`: aplicación + adaptadores.
+- `JobRepository`, `S3StorageAdapter`, cola y notificaciones de progreso comparten contratos de dominio con la API donde tiene sentido (DTO internos versionados).
+
+### 2.8.4 Diagrama de código (UML — organización y clases clave)
+
+**Objetivo**: mostrar jerarquía de clases/módulos y **patrones** (repositorio, adaptador, servicio de aplicación), no el detalle de cada método. Los colores indican **capa**.
+
+```mermaid
+classDiagram
+  direction TB
+
+  class JobController {
+    <<API / Transporte>>
+    +create_job()
+    +get_job()
+    +stream_progress()
+  }
+
+  class DuaController {
+    <<API / Transporte>>
+    +get_draft()
+    +list_issues()
+  }
+
+  class CreateJobService {
+    <<Aplicación>>
+    +execute(cmd: CreateJobCommand) JobDto
+  }
+
+  class Job {
+    <<Dominio>>
+    +id: UUID
+    +status: JobStatus
+    +cancel()
+  }
+
+  class DuaDraft {
+    <<Dominio>>
+    +fields: FieldValue[]
+    +attach_evidence()
+  }
+
+  class IJobRepository {
+    <<Dominio / Puerto>>
+    <<interface>>
+    +save(job: Job)
+    +get(job_id: UUID) Job
+  }
+
+  class SqlJobRepository {
+    <<Infraestructura>>
+    +save(job: Job)
+    +get(job_id: UUID) Job
+  }
+
+  class ISqsPublisher {
+    <<Dominio / Puerto>>
+    <<interface>>
+    +publish_pipeline_message(envelope: dict)
+  }
+
+  class SqsPublisher {
+    <<Infraestructura>>
+    +publish_pipeline_message(envelope: dict)
+  }
+
+  JobController ..> CreateJobService : usa
+  CreateJobService ..> Job : crea/modifica
+  CreateJobService ..> IJobRepository : persiste
+  CreateJobService ..> ISqsPublisher : encola
+  SqlJobRepository ..|> IJobRepository : implementa
+  SqsPublisher ..|> ISqsPublisher : implementa
+  DuaController ..> DuaDraft : lectura vía servicios de consulta
+
+  style JobController fill:#e3f2fd
+  style DuaController fill:#e3f2fd
+  style CreateJobService fill:#fff3e0
+  style Job fill:#e8f5e9
+  style DuaDraft fill:#e8f5e9
+  style IJobRepository fill:#e8f5e9
+  style ISqsPublisher fill:#e8f5e9
+  style SqlJobRepository fill:#fce4ec
+  style SqsPublisher fill:#fce4ec
+```
+
+**Organización de carpetas propuesta (`src/backend`) — código fuente**
+
+```text
+src/backend/
+├── api/
+│   ├── main.py                 # FastAPI app, lifespan, routers
+│   ├── deps.py                 # Inyección de dependencias (repos, clients)
+│   ├── middleware/
+│   │   ├── request_context.py  # request_id / trace
+│   │   └── security.py         # JWT Cognito
+│   └── routers/
+│       ├── health.py
+│       ├── jobs.py
+│       └── dua.py
+├── application/
+│   ├── commands/
+│   │   └── create_job.py
+│   ├── queries/
+│   │   └── get_job_status.py
+│   └── services/
+│       └── create_job_service.py
+├── domain/
+│   ├── jobs/
+│   │   ├── job.py
+│   │   └── repositories.py   # interfaces (ports)
+│   ├── dua/
+│   │   ├── dua_draft.py
+│   │   └── value_objects.py
+│   └── common/
+│       └── ids.py
+├── infrastructure/
+│   ├── persistence/
+│   │   ├── models/             # SQLAlchemy models (opcional)
+│   │   └── sql_job_repository.py
+│   ├── messaging/
+│   │   └── sqs_publisher.py
+│   ├── storage/
+│   │   └── s3_adapter.py
+│   └── cache/
+│       └── redis_progress.py
+├── worker/
+│   ├── main.py                 # entrypoint consumer SQS
+│   └── handlers/
+│       ├── ingest_handler.py
+│       ├── ocr_handler.py
+│       ├── extract_handler.py
+│       ├── map_handler.py
+│       ├── validate_handler.py
+│       └── export_word_handler.py
+├── contracts/
+│   └── openapi.yaml            # fuente o artefacto generado del contrato
+├── tests/
+│   ├── unit/
+│   └── integration/
+├── Dockerfile.api
+├── Dockerfile.worker
+└── pyproject.toml
+```
+
+**Fragmento de código ilustrativo (FastAPI + servicio de aplicación)**
+
+```python
+# src/backend/api/routers/jobs.py
+from fastapi import APIRouter, Depends, status
+from uuid import UUID
+
+from api.deps import get_create_job_service, get_current_user
+from application.services.create_job_service import CreateJobService
+from application.commands.create_job import CreateJobCommand
+
+router = APIRouter(prefix="/v1/jobs", tags=["jobs"])
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_job(
+    cmd: CreateJobCommand,
+    svc: CreateJobService = Depends(get_create_job_service),
+    user=Depends(get_current_user),
+):
+    return svc.execute(cmd, user_id=user.sub).model_dump()
+
+
+@router.get("/{job_id}")
+def get_job(job_id: UUID, svc: CreateJobService = Depends(get_create_job_service), user=Depends(get_current_user)):
+    return svc.get(job_id, user_id=user.sub).model_dump()
+```
+
+```python
+# src/backend/application/services/create_job_service.py
+from dataclasses import dataclass
+from uuid import UUID, uuid4
+
+from domain.jobs.job import Job, JobStatus
+from domain.jobs.repositories import IJobRepository
+from domain.common.ids import UserId
+from infrastructure.messaging.sqs_publisher import ISqsPublisher
+
+
+@dataclass
+class CreateJobService:
+    jobs: IJobRepository
+    bus: ISqsPublisher
+
+    def execute(self, cmd, user_id: str):
+        uid = UserId(user_id)
+        job = Job.create(id=uuid4(), owner=uid, s3_prefix=cmd.s3_prefix)
+        self.jobs.save(job)
+        self.bus.publish_pipeline_message(
+            {"schema_version": 1, "type": "PIPELINE_START", "job_id": str(job.id)}
+        )
+        return job.to_dto()
+
+    def get(self, job_id: UUID, user_id: str):
+        job = self.jobs.get(job_id)
+        job.ensure_owned_by(UserId(user_id))
+        return job.to_dto()
+```
+
+---
