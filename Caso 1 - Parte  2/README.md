@@ -1296,3 +1296,17 @@ class CreateJobService:
 | `S3StorageAdapter` | `src/backend/infrastructure/storage/s3_adapter.py` |
 | `PipelineDispatcher` | `src/backend/worker/main.py` |
 | `ExportWordHandler` | `src/backend/worker/handlers/export_word_handler.py` |
+
+### How to test it
+#### Frontend (desde src/frontend/webapp)
+```
+npm run dev
+```
+
+#### Backend
+```
+pip install -e .
+set DUA_DEV_AUTH=1
+uvicorn api.main:app --reload --host 127.0.0.1 --port 8000
+
+```
