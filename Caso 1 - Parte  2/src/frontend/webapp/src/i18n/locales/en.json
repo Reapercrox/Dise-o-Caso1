@@ -1,0 +1,18 @@
+{
+  "app": {
+    "title": "DUA Streamliner",
+    "nav": {
+      "generate": "Generate DUA",
+      "dashboard": "Dashboard",
+      "reports": "Reports"
+    }
+  },
+  "generate": {
+    "selectFolder": "Select folder",
+    "analyze": "Analyze",
+    "processing": "Processing",
+    "review": "Review",
+    "issues": "Issues",
+    "export": "Export Word (.docx)"
+  }
+}

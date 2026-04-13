@@ -1,0 +1,41 @@
+Metadata-Version: 2.4
+Name: dua-streamliner-backend
+Version: 0.1.0
+Summary: DUA Streamliner API and worker (skeleton)
+Requires-Python: >=3.11
+Description-Content-Type: text/markdown
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.30
+Requires-Dist: pydantic>=2
+Requires-Dist: sqlalchemy>=2.0
+Requires-Dist: httpx>=0.27
+Requires-Dist: boto3>=1.34
+Requires-Dist: redis>=5.0
+Requires-Dist: python-multipart>=0.0.9
+Provides-Extra: dev
+Requires-Dist: pytest>=8; extra == "dev"
+Requires-Dist: ruff>=0.8; extra == "dev"
+Requires-Dist: mypy>=1.13; extra == "dev"
+Requires-Dist: black>=24; extra == "dev"
+
+# DUA Streamliner — Backend (skeleton)
+
+Layered FastAPI + worker layout per course README §2.11. Method bodies are intentionally stubs (`...`) until implementation.
+
+## Run API (dev)
+
+```bash
+cd src/backend
+pip install -e .
+uvicorn api.main:app --reload --host 0.0.0.0 --port 8000
+```
+
+OpenAPI: http://127.0.0.1:8000/docs
+
+## Layout
+
+- `api/` — HTTP layer (routers, middleware, DI)
+- `application/` — commands, queries, services
+- `domain/` — aggregates, value objects, repository ports
+- `infrastructure/` — SQLAlchemy, S3, SQS, Redis
+- `worker/` — SQS consumer and pipeline handlers
